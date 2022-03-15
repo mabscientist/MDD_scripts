@@ -2,13 +2,16 @@
 #R-Script country_matrix.R Madeleine Becker
 #
 #This script generates .txt file with a presence matrix (0=absence, 1=presence, 2=potential presence)
-#from on an MDD-formatted 2-column input file of species and country distributions.
+#from on an MDD-formatted 2-column csv input file of species and country distributions (separated by pipes and no spaces).
 #It also generates a .txt file with total number of species by country (strict, lenient, and endemics only)
 #This script can also be used for spell-checking countries if you stop it after line 51 & "print(countries)"
 #Replace file names with full paths before running script
-#N.B. If you open output files with Excel, the top row will likely be offset by 1 and you'll have to manually correct this
 #
-#Updated: 11/25/20 MAB
+#Can also work for biogeographic realms, if formatted properly. N.B. that totals may be less applicable (e.g. strict vs. lenient)
+#
+#N.B. If you open output files with Excel, the top row will be offset by 1 and you'll have to manually one cell shift right
+#
+#Updated: 2/5/22 MAB
 ####################################################################
 
 #install.packages("readtext")
@@ -19,24 +22,23 @@ library(stringr)
 
 #define input and output files (& path)
 
-#input file needs to be a 2 column tab-delimited text file of species and country distributions 
+#input file needs to be a 2 column comma-delimited text file of species and country distributions 
 #assumes that they have headers & countries should be separated by |
 #? after country names also accepted as potential presence
-country_tsv_path = "C:/Users/madel/Documents/R_scripts_files/MDD/countries_11_19.txt"
+country_csv_path = "C:/Users/madel/Documents/R_scripts_files/MDD/mdd_country_v1.8.csv"
 #output file is a tab-delimited text file in the form of a large (0,1,2) matrix
 #top row = alphabetized countries are vertical
 #leftmost column = organisms in the order the input file gives
-output_matrix_path = "C:/Users/madel/Documents/R_scripts_files/MDD/MDD_country_distribution_matrix_11_19.txt"
+country_matrix_path = "C:/Users/madel/Documents/R_scripts_files/MDD/country_matrix_v1.8.txt"
 #second output file giving the number of species per country
 #column 1: alphabetized country names
 #column 2: number of species in country (strict). total number of species, but only for certain presence (1)
 #column 3: number of species in country (lenient). total number of species, but for certain and potential presence (1,2)
 #column 4: number of endemic species in country. number of species found in that country (1) but either no or only potential presence elsewhere (0,2)
-totals_tsv_file = "C:/Users/madel/Documents/R_scripts_files/MDD/MDD_totals_matrix_11_25.txt"
-  
+country_totals_tsv = "C:/Users/madel/Documents/R_scripts_files/MDD/country_totals_v1.8.txt"
 
-#read in country_tsv
-init <- read.csv(country_tsv_path, header= TRUE,sep="\t",encoding="UTF-8",stringsAsFactors = FALSE)
+#read in country_csv
+init <- read.csv(country_csv_path, header= TRUE,sep=",",encoding="UTF-8",stringsAsFactors = FALSE)
 l <-length(unlist(init[1]))
 
 #makes vector of unique entries of country names from init
@@ -106,7 +108,7 @@ for (i in 1:l){
 }
 
 #write distribution matrix to tsv
-write.table(m,file=output_matrix_path,sep ="\t",fileEncoding="UTF-8")
+write.table(m,file=country_matrix_path,sep ="\t",fileEncoding="UTF-8")
 
 
 #make endemics matrix
@@ -123,4 +125,5 @@ total_endemics = colSums(endemics_m=='1', na.rm=TRUE)
 totals_table = cbind(total_strict, total_lenient, total_endemics)
 
 #write totals matrix to tsv
-write.table(totals_table,file=totals_tsv_file,sep ="\t",fileEncoding="UTF-8")
+write.table(totals_table,file=country_totals_tsv,sep ="\t",fileEncoding="UTF-8")
+
