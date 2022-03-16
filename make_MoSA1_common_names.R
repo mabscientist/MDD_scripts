@@ -1,127 +1,47 @@
 ####################################################################
-#R-Script country_matrix.R Madeleine Becker
+#make_MoSA1_common_names.R Madeleine Becker
 #
-#This script generates .txt file with a presence matrix (0=absence, 1=presence, 2=potential presence)
-#from on an MDD-formatted 2-column csv input file of species and country distributions.
-#It also generates a .txt file with total number of species by country (strict, lenient, and endemics only)
-#This script can also be used for spell-checking countries if you stop it after line 51 & "print(countries)"
-#Replace file names with full paths before running script
-#N.B. If you open output files with Excel, the top row will be offset by 1 and you'll have to manually one cell shift right
+#This script generates .txt file with a two-column table of scientific and common names
+#from a formatted text-scrape of Mammals of South America Volume 1, (also has been used on MoSA2)
+#Common names are separated by '|'
+#N.B. If you open file with something like Notepad, quotation marks will appear around each cell's contents
 #
-#Updated: 2/3/22 MAB
+#Updated: 2/26/21 MAB
 ####################################################################
-
-#install.packages("readtext")
-#install.packages("stringr")
 
 library(readtext)
 library(stringr)
 
-#define input and output files (& path)
+#reads in file and delimits based on entry into a list, then converts to a character vector
+in_file <- readtext("C:/Users/madel/Documents/R_scripts_files/MDD/MOSA1synonyms.txt",dvsep="------------------",encoding="UTF-8")
+string_file <- in_file[2]
+entries <- unlist(str_split(string_file,"------------------\n"))
 
-#input file needs to be a 2 column comma-delimited text file of species and country distributions 
-#assumes that they have headers & countries should be separated by |
-#? after country names also accepted as potential presence
-country_csv_path = "C:/Users/madel/Documents/R_scripts_files/MDD/MDD_country_distrib_2_22.csv"
-#output file is a tab-delimited text file in the form of a large (0,1,2) matrix
-#top row = alphabetized countries are vertical
-#leftmost column = organisms in the order the input file gives
-output_matrix_path = "C:/Users/madel/Documents/R_scripts_files/MDD/MDD_country_distribution_matrix_2_22.txt"
-#second output file giving the number of species per country
-#column 1: alphabetized country names
-#column 2: number of species in country (strict). total number of species, but only for certain presence (1)
-#column 3: number of species in country (lenient). total number of species, but for certain and potential presence (1,2)
-#column 4: number of endemic species in country. number of species found in that country (1) but either no or only potential presence elsewhere (0,2)
-totals_tsv_file = "C:/Users/madel/Documents/R_scripts_files/MDD/MDD_totals_matrix_2_22.txt"
-  
+#takes char_vector and returns species name char_vector: [1] Genus_species [2] Genus_species
+get_species <-function(x){
+  space_species <- word(x,1,2)
+  MDD_species <- gsub(" ","_",space_species)
+  return(MDD_species)}
 
-#read in country_tsv
-init <- read.csv(country_csv_path, header= TRUE,sep=",",encoding="UTF-8",stringsAsFactors = FALSE)
-l <-length(unlist(init[1]))
+#takes char_vector and returns char_vector for all common names: [1] Common Name [2] Common Name|Common Name
+get_common_name <-function(x){
+  all_names <- word(x,2,2,"\n")
+  replaced_comma <- gsub(", ","|",all_names)
+  replaced_semicolon <- gsub("; ","|",replaced_comma)
+  replaced_or <- gsub(" or ","|",replaced_semicolon)
+  deleted_and <- gsub(" and ","",replaced_or)
+  return(deleted_and)}
 
-#makes vector of unique entries of country names from init
-#can be used as a way to check consistency, spelling
-#also sort vector and remove empty "" starting the vector
-countries <- c()
-for (index in 1:l){
-  entry <- init[index,2]
-  indivs <- unlist(str_split(entry,"\\|"))
-  for (i in 1:length(indivs))
-    if (indivs[i] %in% countries)
-      x=1
-    else
-      countries <- c(countries,indivs[i])
-}
-countries <- sort(countries)
-countries <- countries[2:length(countries)]
+MoSA1_Sci_Name<-sapply(entries,get_species,USE.NAMES=FALSE)
+Common_Names<-sapply(entries,get_common_name,USE.NAMES=FALSE)
 
-
-#now that the theoretical spellcheck phase is done,
-#remove the entries with question marks in order to make
-#a vector of the column names for the final matrix
-m_countries <- c()
-for (i in 1:length(countries)){
-  entry <- countries[i]
-  if(substring(entry,nchar(entry)) == "?")
-    if(substring(entry,1,nchar(entry)-1) %in% m_countries)
-      x=1
-    else
-      m_countries <- c(m_countries,substring(entry,1,nchar(entry)-1))
-  else
-    m_countries <- c(m_countries,entry)
-}
-n <- length(m_countries)
-
-#instantiate final matrix and add species as row names
-#and country names as column names
-m <- matrix(,nrow=l,ncol=n)
-species <- (init[1])
-names <- list(unlist(species),m_countries)
-dimnames(m) <- names
-
-#makes a country list (NOT VECTOR), using | split to make
-#a vector for each set of distributions
-vector_list <- list()
-for (index in 1:l){
-  entry <- init[index,2]
-  country_vector <- str_split(entry,"\\|")
-  #country_vectors[index,2] <- country_vector
-  vector_list[index] <- country_vector
-}
-
-#fill in the final matrix
-#go through each country for each species:
-#if the country is within the species's vector --> presence --> 1
-#if the country? is within the species's vector --> potential presence --> 2
-#if the country is not in the species's vector --> absence --> 0
-for (i in 1:l){
-  for (j in 1:n){
-    if (colnames(m)[j] %in% vector_list[[i]])
-      m[i,j]<-1
-    else if (paste(colnames(m)[j],"?",sep="") %in% vector_list[[i]])
-      m[i,j]<-2
-    else
-      m[i,j]<-0
-  }
-}
-
-#write distribution matrix to tsv
-write.table(m,file=output_matrix_path,sep ="\t",fileEncoding="UTF-8")
-
-
-#make endemics matrix
-species_totals = rowSums(m=='1', na.rm=TRUE)
-endemics_only = names(species_totals[species_totals=='1'])
-endemics_m = m[endemics_only,]
-
-#calculate totals
-total_strict = colSums(m=='1', na.rm=TRUE)
-total_lenient = total_strict + colSums(m=='2', na.rm=TRUE)
-total_endemics = colSums(endemics_m=='1', na.rm=TRUE)
-
-#make totals table
-totals_table = cbind(total_strict, total_lenient, total_endemics)
-
-#write totals matrix to tsv
-write.table(totals_table,file=totals_tsv_file,sep ="\t",fileEncoding="UTF-8")
-
+#Creates table of just scientific and common names, write to tab-delimited text file
+#LIMITATIONS:
+#1) Everything is printed with simple quotes around it b/c they're formatted as strings.
+#Fix with Ctrl+H or just open in Excel
+#2) Cannot get rid of UTF-8 quotes for some reason inside scripts
+#Fix with Ctrl+H or just open in Excel (with UTF-8)
+#3) Some didn't work but this was due to incorrect formatting in the original spacing (unexpected newlines) 
+#Also N.B. generates a first row N/A N/A
+common_table <- cbind(MoSA1_Sci_Name,Common_Names)
+write.table(common_table,file="C:/Users/madel/Documents/R_scripts_files/MDD/MoSA1_common_names_TEST.txt",sep="\t",row.names=FALSE, col.names=TRUE,fileEncoding="UTF-8")
